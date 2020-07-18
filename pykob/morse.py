@@ -83,8 +83,7 @@ class Sender:
     def encode(self, char, printChar=False):
         c = char.upper()
         if (printChar):
-            print(c, end="")
-            sys.stdout.flush()
+            print(c, end="", flush=True)
         code = ()
         cti = 0 if self.codeType == config.CodeType.american else 1
         if not c in encodeTable[cti]:

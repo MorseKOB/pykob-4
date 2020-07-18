@@ -3,6 +3,7 @@ dist/
 zips/
 __pycache__/
 *.exe
+.DS_Store
 *.pyc
 .DS_Store
 log.txt
