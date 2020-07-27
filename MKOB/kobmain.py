@@ -129,12 +129,15 @@ def change_wire():
 
 def update_sender(id):
     """display station ID in reader window when there's a new sender"""
-    global sender_ID
-    if id != sender_ID:
+    global sender_ID, myReader
+    if id != sender_ID:  # new sender
         sender_ID = id
         myReader.flush()
-        ka.codereader_append("\n<{}>".format(sender_ID))
+        ka.codereader_append("\n\n<{}>".format(sender_ID))
         kobstationlist.new_sender(sender_ID)
+        myReader = morse.Reader(
+                wpm=kc.WPM, codeType=kc.CodeType,
+                callback=readerCallback)  # reset to nominal code speed
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
@@ -142,8 +145,10 @@ def readerCallback(char, spacing):
         sp = (spacing - 0.25) / 1.25  # adjust for American Morse spacing
     else:
         sp = spacing
-    if sp > 5:
-        txt = "__" if char != "~" else ""
+    if sp > 100:
+        txt = " * " if char != "~" else ""
+    elif sp > 10:
+        txt = "  —  "
     elif sp < -0.2:
         txt = ""
     elif sp < 0.2:
@@ -157,7 +162,17 @@ def readerCallback(char, spacing):
         txt = n * " "
     txt += char
     ka.codereader_append(txt)
-##    print("kobmain: {:.2f} '{}'".format(spacing, txt))  # TODO: temporary
+    if char == "=":
+        ka.codereader_append("\n")
+
+def reset_wire_state():
+    """log the current latching states and reinitialize"""
+    global kob_latched, keyboard_latched, internet_latched
+    print("Reset\n kob_latched: {}\n keyboard_latched: {}\n internet_latched: {}"
+            .format(kob_latched, keyboard_latched, internet_latched))
+    kob_latched = True
+    keyboard_latched = True
+    internet_latched = True
 
 # initialization
 

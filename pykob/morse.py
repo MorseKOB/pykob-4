@@ -28,8 +28,9 @@ morse.py
 Provides classes for sending and reading American and International Morse code.
 """
 
-import sys, os
+import sys
 import codecs
+from pathlib import Path
 from threading import Timer
 from pykob import config
 
@@ -41,11 +42,16 @@ MAXINT = sys.maxsize # a very large integer
 Code sender class
 """
 
+# Resource folder
+root_folder = Path(__file__).parent
+data_folder = root_folder / "data"
+
 # read code tables
 encodeTable = [{}, {}]  # one dictionary each for American and International
-dir = os.path.dirname(os.path.abspath(__file__))
+
 def readEncodeTable(codeType, filename):
-    fn = os.path.join(dir, filename)
+    fn = data_folder / filename
+    # print("Load encode table: ", fn)
     f = codecs.open(fn, encoding='utf-8')
     cti = 0 if codeType == config.CodeType.american else 1
     f.readline()  # ignore first line
@@ -68,7 +74,7 @@ class Sender:
             self.charSpace += int((60000 / cwpm - self.dotLen *
                     DOTSPERWORD) / 6)
             self.wordSpace = 2 * self.charSpace
-        print ("wpm", wpm, "cwpm", cwpm) # ZZZ
+##        print ("wpm", wpm, "cwpm", cwpm) # ZZZ probably don't need anymore
         delta = 60000 / wpm - 60000 / cwpm  # amount to stretch each word
         if spacing == config.Spacing.char:
             self.charSpace += int(delta / 6)
@@ -132,14 +138,14 @@ MINDASHLEN      = 1.5  # dot vs dash threshold (in dots)
 MINMORSESPACE   = 2.0  # intrasymbol space vs Morse (in dots)
 MAXMORSESPACE   = 6.0  # maximum length of Morse space (in dots)
 MINCHARSPACE    = 2.7  # intrasymbol space vs character space (in dots)
-MINLLEN         = 4.5  # minimum length of L character (in dots)
+MINLLEN         = 5.5  # minimum length of L character (in dots)
 MORSERATIO      = 0.95 # length of Morse space relative to surrounding spaces
 ALPHA           = 0.5  # weight given to wpm update values (for smoothing)
 
 # read code tables
 decodeTable = [{}, {}]  # one dictionary each for American and International
 def readDecodeTable(codeType, filename):
-    fn = os.path.dirname(os.path.abspath(__file__)) + '/' + filename
+    fn = data_folder / filename
     f = codecs.open(fn, encoding='utf-8')
     f.readline()  # ignore first line
     for s in f:
@@ -182,7 +188,7 @@ class Reader:
             else:
                 self.codeBuf[self.nChars] += '.'  # dot
             self.markBuf[self.nChars] = mk
-        self.flusher = Timer(((8.0 * self.truDot) / 1000.0), self.flush)  # if idle 8 dot times call `flush`
+        self.flusher = Timer(((20.0 * self.truDot) / 1000.0), self.flush)  # if idle call `flush`
         self.flusher.start()
 
     def setWPM(self, wpm):
