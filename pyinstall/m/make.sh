@@ -30,7 +30,7 @@ if [ -d "dist" ]; then rm -Rf dist; fi
 
 # Build Configure.exe
 echo "Building Configure..."
-python3 -m PyInstaller --clean --log-level INFO --workpath=build --distpath=distC Configure.spec
+python3 -m PyInstaller --clean --noconfirm --log-level INFO --osx-bundle-identifier com.github.morsekop --workpath=build --distpath=distC Configure.spec
 retVal=$?
 if [ $retVal -ne 0 ]; then
     echo "Error generating Command.exe: $retVal"
@@ -39,7 +39,7 @@ fi
 
 # Build MKOB.exe
 echo "Building MKOB..."
-python3 -m PyInstaller --clean --log-level INFO --workpath=build --distpath=distM MKOB.spec
+python3 -m PyInstaller --clean --noconfirm --log-level INFO --osx-bundle-identifier com.github.morsekop --workpath=build --distpath=distM MKOB.spec
 retVal=$?
 if [ $retVal -ne 0 ]; then
     echo "Error generating MKOB.exe: $retVal"

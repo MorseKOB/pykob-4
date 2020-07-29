@@ -90,4 +90,4 @@ coll = COLLECT(exe,
 app = BUNDLE(coll,
              name='MKOB.app',
              icon=None,
-             bundle_identifier=None)
+             bundle_identifier='com.github.morsekob')
