@@ -104,4 +104,7 @@ try:
     myKOB.sounder(mySender.encode('+')) # Close the circuit
 except KeyboardInterrupt:
     print()
+    print("Sorry to see you leave early.")
+finally:
+    print()
     sys.exit(1)     # Indicate this was an abnormal exit
