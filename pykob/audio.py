@@ -33,22 +33,19 @@ from pathlib import Path
 from pykob import log
 
 try:
-    import pyaudio
+    import sounddevice as sd
+    import soundfile as sf
     ok = True
 except:
-    log.log('PyAudio not installed.')
+    log.err('SoundDevice and/or SoundFile not installed.')
     ok = False
 
-BUFFERSIZE = 16
-
-nFrames = [0, 0]
-frames = [None, None]
-nullFrames = None
-iFrame = [0, 0]
+clickClackSound = [0, 0]
+soundData = [[],[]]
 sound = 0
+
 if ok:
-    pa = pyaudio.PyAudio()
-    # Resource folder
+    # Get the 'Resource' folder
     root_folder = Path(__file__).parent
     resource_folder = root_folder / "resources"
     # Audio files
@@ -56,42 +53,14 @@ if ok:
 
     for i in range(len(audio_files)):
         fn = resource_folder / audio_files[i]
-        # print("Load audio file:", fn)
-        f = wave.open(str(fn), mode='rb')
-        nChannels = f.getnchannels()
-        sampleWidth = f.getsampwidth()
-        sampleFormat = pa.get_format_from_width(sampleWidth)
-        frameWidth = nChannels * sampleWidth
-        frameRate = f.getframerate()
-        nFrames[i] = f.getnframes()
-        frames[i] = f.readframes(nFrames[i])
-        iFrame[i] = nFrames[i]
-        f.close()
-    nullFrames = bytes(frameWidth*BUFFERSIZE)
+        log.info("Load audio file: {}".format(fn))
+        # Extract data and sampling rate from file
+        data, fs = sf.read(fn, dtype='float32')
+        soundData[i] = [data, fs]
 
 def play(snd):
-    global sound
-    sound = snd
-    iFrame[sound] = 0
-
-def callback(in_data, frame_count, time_info, status_flags):
-    if frame_count != BUFFERSIZE:
-        log.err('Unexpected frame count request from PyAudio:', frame_count)
-    if iFrame[sound] + frame_count < nFrames[sound]:
-        startByte = iFrame[sound] * frameWidth
-        endByte = (iFrame[sound] + frame_count) * frameWidth
-        outData = frames[sound][startByte:endByte]
-        iFrame[sound] += frame_count
-        return (outData, pyaudio.paContinue)
-    else:
-        return(nullFrames, pyaudio.paContinue)
-
-if ok:
-    apiInfo = pa.get_default_host_api_info()
-    apiName = apiInfo['name']
-    devIdx = apiInfo['defaultOutputDevice']
-    devInfo = pa.get_device_info_by_index(devIdx)
-    devName = devInfo['name']
-    strm = pa.open(rate=frameRate, channels=nChannels, format=sampleFormat,
-            output=True, output_device_index=devIdx, frames_per_buffer=BUFFERSIZE,
-            stream_callback=callback)
+    global soundData
+    soundInfo = soundData[snd]
+    sound = soundInfo[0]
+    sdata = soundInfo[1]
+    sd.play(sound, sdata)
