@@ -28,7 +28,6 @@ audio module
 Provides audio for simulated sounder.
 """
 
-import wave
 from pathlib import Path
 from pykob import log
 
@@ -37,8 +36,9 @@ try:
     import soundfile as sf
     ok = True
 except:
-    log.err('SoundDevice and/or SoundFile not installed.')
+    log.err("SoundDevice and/or SoundFile not installed, or couldn't create audio output stream.")
     ok = False
+
 
 clickClackSound = [0, 0]
 soundData = [[],[]]
@@ -55,12 +55,30 @@ if ok:
         fn = resource_folder / audio_files[i]
         log.info("Load audio file: {}".format(fn))
         # Extract data and sampling rate from file
-        data, fs = sf.read(fn, dtype='float32')
-        soundData[i] = [data, fs]
+        with sf.SoundFile(fn) as f:
+            data = f.buffer_read(frames=-1, dtype='int32')
+            soundData[i] = [data, f.channels]
 
 def play(snd):
     global soundData
     soundInfo = soundData[snd]
-    sound = soundInfo[0]
-    sdata = soundInfo[1]
-    sd.play(sound, sdata)
+    audioData = soundInfo[0]
+    channels = soundInfo[1]
+    audioOutputStream = sd.RawOutputStream(latency='low', blocksize=0, channels=channels, dtype='int32')
+    with audioOutputStream:
+        audioOutputStream.write(audioData)
+
+"""
+Test code
+"""
+if __name__ == "__main__":
+    # Self-test
+    import time
+    #  Play 'click' and 'clack'
+    play(0)
+    time.sleep(0.3)
+    play(1)
+    time.sleep(0.3)
+    play(0)
+    time.sleep(0.3)
+    play(1)
