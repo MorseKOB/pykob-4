@@ -119,34 +119,32 @@ class Recorder:
         """
         Play a recording to the configured sounder.
         """
-        self.__lastTS = -1.0  # Used to time playback
         with open(self.__source_file_path, "r") as fp:
             for line in fp:
-                data = json.loads(line)
-                ts = data['ts'] # Get the timestamp to know when to play
                 dateTimeStr = ""
                 if showDateTime:
                     dateTime = datetime.fromtimestamp(ts / 1000.0)
                     dateTimeStr = str(dateTime.ctime()) + ": "
-                if self.__lastTS < 0.0:
-                    self.__lastTS = ts
-                timediff = (ts - self.__lastTS) / 1000.0  # Time difference in seconds
-                if timediff > 2.0:
-                    # For very long delays, sleep a maximum of 8 seconds
-                    # ZZZ - 8 second msx will be configurable
-                    if timediff > 8.0:
-                        print("Realtime pause of {} seconds being reduced to 8 seconds".format(timediff))
-                        timediff = 8.0
-                    timediff = round(timediff, 4)
-                    print("Sleep: ", timediff)
-                    time.sleep(timediff)
-                print(dateTimeStr, line, end='')
+##                print(dateTimeStr, line, end='')
+                data = json.loads(line)
                 code = data['c']
-                # Keep track of how long it takes to sound the code
-                codePlayStart = getTimestamp()
+                if code == []:  # Ignore empty code packets
+                    continue
+                pause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
+                # For short pauses (< 1 sec), `KOB.sounder` can handle them more precisely.
+                # However the way `KOB.sounder` handles longer pauses, although it makes sense for
+                # real-time transmissions, is flawed for playback. Better to handle long pauses here.
+                # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
+                # handling in `KOB.sounder`.
+                if pause > 1.0 and pause < 32.767:
+                    # For very long delays, sleep a maximum of 5 seconds
+                    # ZZZ - 5 second msx will be configurable
+                    if pause > 5.0:
+                        print("Realtime pause of {} seconds being reduced to 5 seconds".format(round(pause, 3)))
+                        pause = 5.0
+                    time.sleep(pause)
+                    code[0] = -1  # Remove pause from code seqence since it's already handled
                 kob.sounder(code)
-                codePlayDuration = getTimestamp() - codePlayStart
-                self.__lastTS = ts + codePlayDuration # Remember the file timestamp plus the time to play the code
 
 
 """
