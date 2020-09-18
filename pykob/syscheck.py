@@ -49,9 +49,16 @@ except:
     print('pySerial not installed')
 
 try:
-    import pyaudio
-    pa = pyaudio.PyAudio()
-    print('PyAudio ' + pyaudio.get_portaudio_version_text())
-except:
-    print('PyAudio not installed')
+    import sounddevice as sd
+    print("python-sounddevice ('sounddevice') " + sd.__version__)
+    pav = sd.get_portaudio_version()
+    print('{} {}'.format(pav[1], pav[0]))
+except Exception as ex:
+    print("python-sounddevice ('sounddevice') or PortAudio not installed")
 
+try:
+    import soundfile as sf
+    print('soundfile ' + sf.__version__)
+    print('lib soundfile ' + sf.__libsndfile_version__)
+except:
+    print('soundfile not installed')
