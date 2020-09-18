@@ -44,7 +44,7 @@ try:
     print('pySerial ' + serial.VERSION)
     import serial.tools.list_ports
     for p in serial.tools.list_ports.comports():
-        print(p[1])
+        print(' Port: {} {}'.format(p.device, p.description))
 except:
     print('pySerial not installed')
 
