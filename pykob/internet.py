@@ -49,7 +49,7 @@ codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts
 NUL = '\x00'
 
 class Internet:
-    def __init__(self, officeID, callback=None):
+    def __init__(self, officeID, callback=None, record_callback=None):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
                 socket.SOCK_DGRAM)[0][4]
@@ -58,16 +58,15 @@ class Internet:
         self.wireNo = 0
         self.sentSeqNo = 0
         self.rcvdSeqNo = -1
-        self.tLastListener = 0
+        self.tLastListener = 0.0
         self.disconnect()  # to establish a UDP connection with the server
-        keepAliveThread = threading.Thread(target=self.keepAlive)
-        keepAliveThread.daemon = True
+        keepAliveThread = threading.Thread(name='Internet-KeepAlive', daemon=True, target=self.keepAlive)
         keepAliveThread.start()
         self.callback = callback
-        if callback:
-            callbackThread = threading.Thread(target=self.callbackRead)
-            callbackThread.daemon = True
-            callbackThread.start()
+        self.record_callback = record_callback
+        if callback or record_callback:
+            internetReadThread = threading.Thread(name='Internet-DataRead', daemon=True, target=self.callbackRead)
+            internetReadThread.start()
         self.ID_callback = None
         self.sender_callback = None
 
@@ -81,9 +80,15 @@ class Internet:
         self.socket.sendto(shortPacket, self.address)
 
     def callbackRead(self):
+        """
+        Called by the Internet Read thread `run` to read code from the internet connection.
+        """
         while True:
             code = self.read()
-            self.callback(code)
+            if self.callback:
+                self.callback(code)
+            if self.record_callback:
+                self.record_callback(code)
 
     def read(self):
         while True:
@@ -102,7 +107,7 @@ class Internet:
                         self.ID_callback(stnID)
                     if seqNo == self.rcvdSeqNo + 2:
                         self.rcvdSeqNo = seqNo  # update sender's seq no, ignore others
-                if n > 0 and seqNo != self.rcvdSeqNo:  # code packet
+                elif n > 0 and seqNo != self.rcvdSeqNo:  # code packet
                     if self.sender_callback:
                         self.sender_callback(stnID)
                     if seqNo != self.rcvdSeqNo + 1:  # sequence break
@@ -119,13 +124,17 @@ class Internet:
         n = len(code)
         if n == 0:
             return
+        if n > 50:
+            log.log("WARNING", "PyKOB.internet: code sequence too long")
+            return
         codeBuf = code + (51-n)*(0,) + (n, txt.encode(encoding='ascii'))
         self.sentSeqNo += 1
-        codePacket = codePacketFormat.pack(DAT, 492, self.officeID.encode('ascii'),
+        codePacket = codePacketFormat.pack(
+                DAT, 492, self.officeID.encode('ascii'),
                 self.sentSeqNo, *codeBuf)
         for i in range(2):
             self.socket.sendto(codePacket, self.address)
-        
+
     def keepAlive(self):
         while True:
             self.sendID()
@@ -158,4 +167,9 @@ class Internet:
     def monitor_sender(self, sender_callback):
         """start monitoring changes in current sender"""
         self.sender_callback = sender_callback
+
+    def record_code(self, record_callback):
+        """Start recording code received and sent"""
+        self.record_callback = record_callback
+    
         

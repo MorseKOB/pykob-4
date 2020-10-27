@@ -34,14 +34,16 @@ import tkinter as tk
 import sys
 import kobwindow
 
-VERSION = "4.0.10"
+VERSION = "4.0.13"
 MKOB_VERSION_TEXT = "MorseKOB " + VERSION
 print(MKOB_VERSION_TEXT)
+print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 try:
     root = tk.Tk()
 ##    root.iconbitmap("resources/mkob.ico")  # TODO: fails with Linux
     kobwindow.KOBWindow(root, MKOB_VERSION_TEXT)
+    
     root.mainloop()
 except KeyboardInterrupt:
     print()

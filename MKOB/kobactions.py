@@ -27,11 +27,12 @@ kobactions.py
 
 Handle actions for controls on main MKOB window
 """
-
+import os
 import tkinter as tk
 import tkinter.messagebox as mb
+import tkinter.filedialog as fd
 import time
-from pykob import config, kob, internet, morse
+from pykob import config, kob, internet, morse, recorder
 import kobconfig as kc
 import kobmain as km
 import kobstationlist as ks
@@ -54,6 +55,22 @@ def doFileOpen():
     kw.txtKeyboard.tag_config('highlight', underline=1)
     kw.txtKeyboard.tag_add('highlight', 'mark')
 
+def doFilePlay():
+    print("Play a file...")
+    pf = fd.askopenfilename(title='Select KOB Recording', filetypes=[('KOB Recording','*.json')])
+    if pf:
+        print(" Play: ", pf)
+        if km.Recorder:
+            km.disconnect()
+            km.kobstationlist.clear_station_list()
+            km.Recorder.source_file_path = pf
+            codereader_clear()
+            km.sender_ID = None
+            dirpath, filename = os.path.split(pf)
+            codereader_append('[{}]'.format(filename))
+            km.Recorder.playback_start(list_data=True, max_silence=5)
+    kw.make_keyboard_focus()
+    
 def doFileExit():
     kw.root.destroy()
     kw.root.quit()
@@ -65,19 +82,22 @@ def doHelpAbout():
 
 # actions for control events
 
-def doOfficeID(event=None):
+def doOfficeID(event):
     kc.OfficeID = kw.varOfficeID.get()
     config.set_station(kc.OfficeID)
     config.save_config()
-    km.myInternet.set_officeID(kc.OfficeID)
+    km.Internet.set_officeID(kc.OfficeID)
+
+def doCircuitCloser():
+    km.from_circuit_closer(kw.varCircuitCloser.get() == 1)
 
 def doWPM(event=None):
     kc.WPM = int(kw.spnWPM.get())
     config.set_text_speed(kw.spnWPM.get())
     config.save_config()
-    km.mySender = morse.Sender(wpm=kc.WPM, cwpm=kc.CWPM,
+    km.Sender = morse.Sender(wpm=kc.WPM, cwpm=kc.CWPM,
             codeType=kc.CodeType, spacing=kc.Spacing)
-    km.myReader = morse.Reader(wpm=kc.WPM, codeType=kc.CodeType,
+    km.Reader = morse.Reader(wpm=kc.WPM, codeType=kc.CodeType,
             callback=km.readerCallback)
 
 def doWireNo(event=None):
@@ -86,8 +106,13 @@ def doWireNo(event=None):
     config.save_config()
     if km.connected:
         km.change_wire()
+    if km.Recorder:
+        km.Recorder.wire = kc.WireNo
 
 def doConnect():
+    if km.Recorder and not km.Recorder.playback_state == recorder.PlaybackState.idle:
+        return # If the recorder is playing a recording to not allow connection
+
     km.toggle_connect()
     color = 'red' if km.connected else 'white'
     kw.cvsConnect.create_rectangle(0, 0, 20, 20, fill=color)
@@ -95,9 +120,73 @@ def doConnect():
 def codereader_append(s):
     """append a string to the code reader window"""
     kw.txtReader.insert('end', s)
-    kw.txtReader.yview_moveto(1)
+    kw.txtReader.see('end')
 
-def escape(event):
-    """regain control of the wire"""
-    codereader_append("\n<Reset>")
-    km.reset_wire_state()
+def codereader_clear():
+    """clear the code reader window"""
+    kw.txtReader.delete('1.0', 'end')
+
+def event_escape(event):
+    """
+    toggle Circuit Closer and regain control of the wire
+    """
+    kw.varCircuitCloser.set(not kw.varCircuitCloser.get())
+    doCircuitCloser()
+    km.reset_wire_state()  # regain control of the wire
+
+def event_playback_move_back15(event):
+    """
+    Move the playback position back 15 seconds.
+    """
+    print("Playback - move back 15 seconds...")
+    if km.Recorder:
+        if km.Reader:
+            km.Reader.flush()  # Flush the Reader content before moving.
+        km.Recorder.playback_move_seconds(-15)
+
+def event_playback_move_forward15(event):
+    """
+    Move the playback position forward 15 seconds.
+    """
+    print("Playback - move forward 15 seconds...")
+    if km.Recorder:
+        if km.Reader:
+            km.Reader.flush()  # Flush the Reader content before moving.
+        km.Recorder.playback_move_seconds(15)
+        
+def event_playback_move_sender_start(event):
+    """
+    Move the playback position to the start of the current sender.
+    """
+    print("Playback - move to sender start...")
+    if km.Recorder:
+        if km.Reader:
+            km.Reader.flush()  # Flush the Reader content before moving.
+        km.Recorder.playback_move_to_sender_begin()
+        
+def event_playback_move_sender_end(event):
+    """
+    Move the playback position to the end of the current sender.
+    """
+    print("Playback - move to next sender...")
+    if km.Recorder:
+        if km.Reader:
+            km.Reader.flush()  # Flush the Reader content before moving.
+        km.Recorder.playback_move_to_sender_end()
+        
+def event_playback_pauseresume(event):
+    """
+    Pause/Resume a recording if currently playing/paused.
+
+    This does not play 'from scratch'. A playback must have been started 
+    for this to have any effect.
+    """
+    if km.Recorder:
+        km.Recorder.playback_pause_resume()
+
+def event_playback_stop(event):
+    """
+    Stop playback of a recording if playing.
+    """
+    if km.Recorder:
+        km.Recorder.playback_stop()

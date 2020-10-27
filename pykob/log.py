@@ -25,16 +25,29 @@ SOFTWARE.
 """
 log module
 
-logs status and error messages.
+logs status, debug and error messages.
 """
 import sys
 import datetime
 
-def log(txt):
+def log(type, msg, dt=None):
+    dtl = dt if dt else str(datetime.datetime.now())[:19]
+    sys.stdout.write('{0} \t{1}: \t{2}\n'.format(dtl, type, msg))
+    sys.stdout.flush()
+
+def logErr(msg):
     dt = str(datetime.datetime.now())[:19]
-    sys.stderr.write('{0} {1}\n'.format(dt, txt))
+    log('ERROR', msg, dt) # Output to the normal output
+    sys.stderr.write('{0} \t{1}: \t{2}\n'.format(dt, type, msg))
     sys.stderr.flush()
+    
+def debug(msg):
+    log('DEBUG', msg)
+    sys.stderr.flush()
+    
+def info(msg):
+    log('INFO', msg)
     
 def err(msg):
     typ, val, trc = sys.exc_info()
-    log('{0} ({1})'.format(msg, val))
+    log('ERROR', '{0}: \t({1})'.format(msg, val))

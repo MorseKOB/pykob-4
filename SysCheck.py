@@ -23,35 +23,34 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""CaptureWire.py
+"""
+syscheck.py
 
-Captures timing information from a KOB wire to a file for
-later playback and analysis.
-
-Usage: python CaptureWire.py wire-no >filename.txt
-
-Examples:
-    py CaptureWire.py 11 >Session.txt
-    py CaptureWire.py 11 >"MTC Round Table.txt"
+Displays version numbers of Python-related software and the names of
+available serial ports.
 """
 
 import sys
-import time
-from pykob import internet
+print('Python ' + sys.version)
 
-VERSION = '1.3'
-ID = 'AC - monitoring'
+try:
+    import pykob
+    print('PyKOB ' + pykob.VERSION)
+except:
+    print('PyKOB not installed')
 
-wire = int(sys.argv[1])
+try:
+    import pyaudio
+    pa = pyaudio.PyAudio()
+    print('PyAudio ' + pyaudio.get_portaudio_version_text())
+except:
+    print('PyAudio not installed')
 
-myInternet = internet.Internet(ID)
-myInternet.connect(wire)
-time.sleep(1)
-
-print('CaptureWire {}. {}'.format(VERSION, time.asctime()))
-sys.stdout.flush()
-
-while True:
-    code = myInternet.read()
-    print(*code)
-    sys.stdout.flush()
+try:
+    import serial
+    print('pySerial ' + serial.VERSION)
+    import serial.tools.list_ports
+    for p in serial.tools.list_ports.comports():
+        print(p[1])
+except:
+    print('pySerial not installed')

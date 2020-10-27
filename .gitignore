@@ -3,10 +3,15 @@ dist*/
 zips/
 __pycache__/
 *.exe
+.vscode/
+.DS_Store
+*.log
 *.pyo
 *.pyc
 *.toc
-.DS_Store
+*.zip
 log.txt
 pyinstall/w/Configure/
 pyinstall/w/MKOB/
+# Ignore JSON files from recordings. If JSON files are needed in the source, include them with a '!' line.
+*.json

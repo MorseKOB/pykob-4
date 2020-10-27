@@ -53,19 +53,25 @@ import pykob
 import socket
 import sys
 from distutils.util import strtobool
-from enum import Enum, unique
+from enum import Enum, IntEnum, unique
 from pykob import log
 
 @unique
-class Spacing(Enum):
+class Spacing(IntEnum):
     none = 0
     char = 1
     word = 2
 
 @unique
-class CodeType(Enum):
+class CodeType(IntEnum):
     american = 1
     international = 2
+
+@unique
+class InterfaceType(IntEnum):
+    key_sounder = 1
+    loop = 2
+    keyer = 3
 
 # Application name
 __APP_NAME = "pykob"
@@ -75,6 +81,8 @@ __CONFIG_SECTION = "PYKOB"
 __SERIAL_PORT_KEY = "PORT"
 # User INI file Parameters/Keys
 __CODE_TYPE_KEY = "CODE_TYPE"
+__INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
+__INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
 __LOCAL_KEY = "LOCAL"
 __MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
 __REMOTE_KEY = "REMOTE"
@@ -112,6 +120,8 @@ serial_port = None
 
 # User Settings
 code_type = CodeType.american
+interface_type = InterfaceType.loop
+invert_key_input = False
 local = True
 remote = True
 sound = True
@@ -190,10 +200,59 @@ def set_code_type(s):
     elif s=="I" or s=="INTERNATIONAL":
         code_type = CodeType.international
     else:
-        log.err("TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s))
-        return
+        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
     user_config.set(__CONFIG_SECTION, __CODE_TYPE_KEY, code_type.name.upper())
 
+
+def set_interface_type(s):
+    """Sets the Interface Type (for Key-Sounder, Loop or Keyer)
+
+    Parameters
+    ----------
+    s : str
+        The value `KS|KEY_SOUNDER` will set the interface type to 'InterfaceType.key_sounder'.  
+        The value `L|LOOP` will set the interface type to 'InterfaceType.loop'.
+        The value `K|KEYER` will set the interface type to 'InterfaceType.keyer'.  
+    """
+
+    global interface_type
+    s = s.upper()
+    if s=="KS" or s=="KEY_SOUNDER":
+        interface_type = InterfaceType.key_sounder
+    elif s=="L" or s=="LOOP":
+        interface_type = InterfaceType.loop
+    elif s=="K" or s=="KEYER":
+        interface_type = InterfaceType.keyer
+    else:
+        msg = "TYPE value '{}' is not a valid `Interface Type` value of 'KEY_SOUNDER', 'LOOP' or 'KEYER'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
+    user_config.set(__CONFIG_SECTION, __INTERFACE_TYPE_KEY, interface_type.name.upper())
+
+
+def set_invert_key_input(b):
+    """
+    Enable/disable key input signal (DSR) invert.
+
+    When key-invert is enabled, the key input (DSR on the serial interface) 
+    is inverted (because the RS-232 logic is inverted). This is primarily used 
+    when the input is from a modem (in dial-up connection).
+    
+    Parameters
+    ----------
+    b : string 'true/false'
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable key invert. Values of `NO`|`OFF`|`FALSE` will disable key invert.
+    """
+    global invert_key_input
+    try:
+        invert_key_input = strtobool(str(b))
+        user_config.set(__CONFIG_SECTION, __INVERT_KEY_INPUT_KEY, onOffFromBool(invert_key_input))
+    except ValueError as ex:
+        log.err("INVERT KEY INPUT value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
 
 def set_local(l):
     """Enable/disable local copy
@@ -220,13 +279,13 @@ def set_remote(r):
     """Enable/disable remote send
 
     When remote send is enabled, the content will be sent to the  
-    station+wire configured.  
+    wire configured.  
     
     Parameters
     ----------
     r : str
         The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
-        will enable local copy. Values of `NO`|`OFF`|`FALSE` will disable local copy.
+        will enable remote send. Values of `NO`|`OFF`|`FALSE` will disable remote send.
     """
 
     global remote
@@ -344,8 +403,9 @@ def set_spacing(s):
     elif s=="W" or s=="WORD":
         spacing = Spacing.word
     else:
-        log.err("SPACING value '{}' is not a valid `Spacing` value of 'NONE', 'CHAR' or 'WORD'.".format(s))
-        return
+        msg = "SPACING value '{}' is not a valid `Spacing` value of 'NONE', 'CHAR' or 'WORD'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
     user_config.set(__CONFIG_SECTION, __SPACING_KEY, spacing.name.upper())
 
 
@@ -426,6 +486,8 @@ def print_config():
     print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
     print("Code type:", code_type.name.upper())
+    print("Interface type:", interface_type.name.upper())
+    print("Invert key input:", onOffFromBool(invert_key_input))
     print("Local copy:", onOffFromBool(local))
     print("Remote send:", onOffFromBool(remote))
     print("Sound:", onOffFromBool(sound))
@@ -470,6 +532,8 @@ def read_config():
     global serial_port
     #
     global code_type
+    global interface_type
+    global invert_key_input
     global local
     global min_char_speed
     global remote
@@ -525,6 +589,8 @@ def read_config():
 
     user_config_defaults = {\
         __CODE_TYPE_KEY:"AMERICAN", \
+        __INTERFACE_TYPE_KEY:"LOOP", \
+        __INVERT_KEY_INPUT_KEY:"OFF", \
         __LOCAL_KEY:"ON", \
         __MIN_CHAR_SPEED_KEY:"18", \
         __REMOTE_KEY:"ON", \
@@ -559,6 +625,20 @@ def read_config():
             code_type = CodeType.international
         else:
             raise ValueError(_code_type)
+        __option = "Interface type"
+        __key = __INTERFACE_TYPE_KEY
+        _interface_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
+        if _interface_type == "KEY_SOUNDER":
+            interface_type = InterfaceType.key_sounder
+        elif _interface_type == "LOOP":
+            interface_type = InterfaceType.loop
+        elif _interface_type == "KEYER":
+            interface_type = InterfaceType.keyer
+        else:
+            raise ValueError(_interface_type)
+        __option = "Invert key input"
+        __key = __INVERT_KEY_INPUT_KEY
+        invert_key_input = user_config.getboolean(__CONFIG_SECTION, __key)
         __option = "Local copy"
         __key = __LOCAL_KEY
         local = user_config.getboolean(__CONFIG_SECTION, __key)
@@ -610,29 +690,33 @@ read_config()
 
 code_type_override = argparse.ArgumentParser(add_help=False)
 code_type_override.add_argument("-T", "--type", default=code_type.name.upper(), \
-help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="type", dest="code_type")
+help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="code-type", dest="code_type")
+
+interface_type_override = argparse.ArgumentParser(add_help=False)
+interface_type_override.add_argument("-I", "--interface", default=interface_type.name.upper(), \
+help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.", metavar="interface-type", dest="interface_type")
+
+invert_key_input_override = argparse.ArgumentParser(add_help=False)
+invert_key_input_override.add_argument("-M", "--iki", default=invert_key_input, \
+help="Enable/disable inverting the key input signal (used for dial-up/modem connections).", metavar="invert-key-input", dest="invert_key_input")
 
 local_override = argparse.ArgumentParser(add_help=False)
 local_override.add_argument("-L", "--local", default=local, \
-help="Enable/disable local copy of transmitted code.", metavar="local", dest="local")
-
-remote_override = argparse.ArgumentParser(add_help=False)
-remote_override.add_argument("-R", "--remote", default=remote, \
-help="Enable/disable transmission over the internet on the specified wire.", \
-metavar="remote", dest="remote")
-
-serial_port_override = argparse.ArgumentParser(add_help=False)
-serial_port_override.add_argument("-p", "--port", default=serial_port, \
-help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
-
-text_speed_override = argparse.ArgumentParser(add_help=False)
-text_speed_override.add_argument("-t", "--textspeed", default=text_speed, type=int, \
-help="The morse text speed in words per minute.", metavar="wpm", dest="text_speed")
+help="Enable/disable local copy of transmitted code.", metavar="local-copy", dest="local")
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", default=min_char_speed, type=int, \
 help="The minimum character speed to use in words per minute (used for Farnsworth timing).", \
-metavar="wpm", dest="char_speed_min")
+metavar="wpm", dest="min_char_speed")
+
+remote_override = argparse.ArgumentParser(add_help=False)
+remote_override.add_argument("-R", "--remote", default=remote, \
+help="Enable/disable transmission over the internet on the specified wire.", \
+metavar="remote-send", dest="remote")
+
+serial_port_override = argparse.ArgumentParser(add_help=False)
+serial_port_override.add_argument("-p", "--port", default=serial_port, \
+help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
 
 sound_override = argparse.ArgumentParser(add_help=False)
 sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF", 
@@ -653,6 +737,10 @@ help="The spacing (NONE|CHAR|WORD) to use.", metavar="spacing", dest="spacing")
 station_override = argparse.ArgumentParser(add_help=False)
 station_override.add_argument("-S", "--station", default=station, \
 help="The Station ID to use (or 'NONE').", metavar="station", dest="station")
+
+text_speed_override = argparse.ArgumentParser(add_help=False)
+text_speed_override.add_argument("-t", "--textspeed", default=text_speed, type=int, \
+help="The morse text speed in words per minute.", metavar="wpm", dest="text_speed")
 
 wire_override = argparse.ArgumentParser(add_help=False)
 wire_override.add_argument("-W", "--wire", default=wire, \
